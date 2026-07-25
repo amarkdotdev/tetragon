@@ -15,6 +15,7 @@ import (
 	"github.com/cilium/tetragon/pkg/btf"
 	"github.com/cilium/tetragon/pkg/k8s/apis/cilium.io/v1alpha1"
 	slimv1 "github.com/cilium/tetragon/pkg/k8s/slim/k8s/apis/meta/v1"
+	"github.com/cilium/tetragon/pkg/policyfilter"
 	"github.com/cilium/tetragon/pkg/testutils"
 	"github.com/cilium/tetragon/pkg/tracingpolicy"
 )
@@ -570,4 +571,23 @@ spec:
 
 	err := checkCrd(t, crd)
 	require.Error(t, err)
+}
+
+// TestUprobeEventConfigCarriesPolicyID asserts a plain (non-RIC) uprobe carries
+// the policy's policyfilter id, so a podSelector-scoped policy filters uprobe
+// events in the kernel; 0 means no filtering.
+func TestUprobeEventConfigCarriesPolicyID(t *testing.T) {
+	spec := &v1alpha1.UProbeSpec{Path: "/usr/bin/app", Symbols: []string{"main"}}
+
+	filtered, err := initUprobeConfig(spec,
+		&addUprobeIn{policyName: "policy", policyID: policyfilter.PolicyID(7)}, &uprobeHas{}, nil, 0)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, cleanupUprobeConfig(filtered)) })
+	require.Equal(t, uint32(7), filtered.eventConfig.PolicyID)
+
+	unfiltered, err := initUprobeConfig(spec,
+		&addUprobeIn{policyName: "policy"}, &uprobeHas{}, nil, 0)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, cleanupUprobeConfig(unfiltered)) })
+	require.Zero(t, unfiltered.eventConfig.PolicyID, "no policyfilter id means no filtering")
 }

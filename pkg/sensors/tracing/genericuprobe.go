@@ -45,6 +45,7 @@ import (
 	"github.com/cilium/tetragon/pkg/logger/logfields"
 	"github.com/cilium/tetragon/pkg/observer"
 	"github.com/cilium/tetragon/pkg/option"
+	"github.com/cilium/tetragon/pkg/policyfilter"
 	"github.com/cilium/tetragon/pkg/selectors"
 	"github.com/cilium/tetragon/pkg/sensors"
 	"github.com/cilium/tetragon/pkg/sensors/base"
@@ -456,6 +457,7 @@ func (k *observerUprobeSensor) LoadProbe(args sensors.LoadProbeArgs) error {
 
 type addUprobeIn struct {
 	policyName string
+	policyID   policyfilter.PolicyID
 	// attachPath overrides the attach/ELF-parse path; spec.Path is still
 	// reported in events. Set per-uprobe for resolvePathInContainer.
 	attachPath        string
@@ -1067,6 +1069,7 @@ func createGenericUprobeSensor(
 
 	in := addUprobeIn{
 		policyName: polInfo.name,
+		policyID:   polInfo.policyID,
 		celExprs:   celExprs,
 	}
 
@@ -1213,6 +1216,8 @@ func initUprobeArgs(spec *v1alpha1.UProbeSpec, has *uprobeHas, in *addUprobeIn, 
 	eventConfig.ArgIndex = argCfg.argIdx
 	eventConfig.BTFArg = argCfg.allBTFArgs
 	eventConfig.RegArg = argCfg.regArg
+	// Scope events to the policy's pods via policyfilter (0 = no filtering).
+	eventConfig.PolicyID = uint32(in.policyID)
 	setRetprobe, argReturnPrinters, err := getUprobeReturnArg(spec, argCfg, eventConfig)
 	if err != nil {
 		return err
