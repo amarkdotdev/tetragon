@@ -126,6 +126,7 @@ func runCmd() *cobra.Command {
 	monitorMode := false
 	allParams := false
 	allTests := false
+	var labels []string
 	var params map[string]string
 	var outputFile = ""
 	outputFmt, _ := option.NewEnum([]string{"text", "json"}, "text")
@@ -167,11 +168,12 @@ func runCmd() *cobra.Command {
 
 			ctx := context.Background()
 			var ptFilterFn func(t *policytest.T) bool
-			if allTests {
+			switch {
+			case allTests:
 				ptFilterFn = func(_ *policytest.T) bool {
 					return true
 				}
-			} else {
+			case len(args) > 0:
 				names := make(map[string]struct{})
 				for _, arg := range args {
 					names[arg] = struct{}{}
@@ -179,6 +181,34 @@ func runCmd() *cobra.Command {
 				ptFilterFn = func(t *policytest.T) bool {
 					_, ok := names[t.Name]
 					return ok
+				}
+			case len(labels) > 0:
+				// selecting by --label alone is allowed
+				ptFilterFn = func(_ *policytest.T) bool {
+					return true
+				}
+			default:
+				ptFilterFn = func(_ *policytest.T) bool {
+					return false
+				}
+			}
+
+			if len(labels) > 0 {
+				labelSet := make(map[policytest.Label]struct{}, len(labels))
+				for _, l := range labels {
+					labelSet[policytest.Label(l)] = struct{}{}
+				}
+				baseFilterFn := ptFilterFn
+				ptFilterFn = func(t *policytest.T) bool {
+					if !baseFilterFn(t) {
+						return false
+					}
+					for _, l := range t.Labels {
+						if _, ok := labelSet[l]; ok {
+							return true
+						}
+					}
+					return false
 				}
 			}
 
@@ -246,5 +276,6 @@ func runCmd() *cobra.Command {
 	flags.Var(outputFmt, "output", "output format "+outputFmt.Allowed())
 	flags.StringVar(&outputFile, "output-file", "", "file to save the tests output. If empty, stdout is used.")
 	flags.BoolVar(&allTests, "all-tests", allTests, "Run all available policy tests")
+	flags.StringSliceVar(&labels, "label", labels, "Run only policy tests with the given label(s) (can be specified multiple times, matches if a test has any of the given labels)")
 	return &cmd
 }
