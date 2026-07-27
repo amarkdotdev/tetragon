@@ -1,4 +1,5 @@
-//go:build !nok8s
+// SPDX-License-Identifier: Apache-2.0
+// Copyright Authors of Tetragon
 
 package tracingpolicy
 
@@ -23,6 +24,7 @@ spec:
 `
 	_, err := FromYAML(crd)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "ReturnArg not specified with Return=true.")
 }
 
 func testUprobeValidationSymbolsAddrsOffsets(t *testing.T, withSymbol, withAdrr, withOff bool) {
@@ -84,6 +86,7 @@ spec:
 
 	_, err := FromYAML(crd)
 	require.Error(t, err)
+	require.Contains(t, err.Error(), "ReturnArg not specified with Return=true.")
 }
 
 func testUprobeValidationOverrideArgNewSymbolAddrOffset(t *testing.T, withSymbol, withAdrr, withOff bool) {
