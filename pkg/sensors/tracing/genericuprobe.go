@@ -699,7 +699,7 @@ func initUprobeSelectors(spec *v1alpha1.UProbeSpec, in *addUprobeIn, state *upro
 	return nil
 }
 
-func cleanupUprobeEntries(ids []idtable.EntryID, openedFiles map[string]*os.File) error {
+func cleanupUprobeEntries(ids []idtable.EntryID, openedFiles map[string]*os.File, alreadyClosedOk bool) error {
 	var errs error
 
 	for _, id := range ids {
@@ -724,6 +724,9 @@ func cleanupUprobeEntries(ids []idtable.EntryID, openedFiles map[string]*os.File
 
 	for path, entryFile := range openedFiles {
 		if err := entryFile.Close(); err != nil {
+			if alreadyClosedOk && errors.Is(err, os.ErrClosed) {
+				continue
+			}
 			errs = errors.Join(errs, fmt.Errorf("problem closing path %q: %w", path, err))
 		}
 	}
@@ -907,7 +910,7 @@ func createGenericUprobeSensor(
 
 	defer func() {
 		if retErr != nil {
-			if cleanupErr := cleanupUprobeEntries(ids, openedFiles); cleanupErr != nil {
+			if cleanupErr := cleanupUprobeEntries(ids, openedFiles, false); cleanupErr != nil {
 				retErr = errors.Join(retErr, cleanupErr)
 			}
 		}
@@ -1003,7 +1006,7 @@ func createGenericUprobeSensor(
 		DisableNotAllowedReason: disableNotAllowedReason,
 		Statuses:                statuses,
 		DestroyHook: func() error {
-			return cleanupUprobeEntries(ids, openedFiles)
+			return cleanupUprobeEntries(ids, openedFiles, true)
 		},
 		PostLoadHook: func() error {
 			var errs error
